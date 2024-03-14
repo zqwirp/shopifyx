@@ -77,14 +77,13 @@ func registerUser(c *gin.Context) {
 		return
 	}
 
-	// TEST SET COOKIE
-	c.SetCookie("accessToken", "THE_TOKEN", 3600, "/", "", false, true)
-
 	// RESPONSE
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "User registered successfully",
 		"data": gin.H{
-			"user": user,
+			"username":    user.Username,
+			"name":        user.Name,
+			"accessToken": "TOKEN",
 		},
 	})
 }
