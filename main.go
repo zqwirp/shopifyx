@@ -61,7 +61,7 @@ func registerUser(c *gin.Context) {
 	}
 
 	// ENCRYPT PASSWORD
-	hashedPassword, err := HashPassword(user.Password)
+	hashedPassword, err := hashPassword(user.Password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user"})
 		return
@@ -85,23 +85,24 @@ func registerUser(c *gin.Context) {
 	})
 }
 
-func HashPassword(password string) (string, error) {
+func hashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 8)
 	return string(bytes), err // string() here converts the byte slice to a string.
 }
 
-func CheckPasswordHash(password, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
-}
+// func checkPasswordHash(password, hash string) bool {
+// 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+// 	return err == nil
+// }
 
 func insertUserIntoDB(username, name, hashedPassword string) error {
 	// CONNECT TO POSTGRES
-	fmt.Println("Connecting to the database...")
-	db, err := sql.Open("postgres", fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		HOST, PORT, DB_USER, DB_PASSWORD, DB_NAME))
+	db, err := sql.Open(
+		"postgres",
+		fmt.Sprintf(
+			"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+			HOST, PORT, DB_USER, DB_PASSWORD, DB_NAME))
 	if err != nil {
-		fmt.Println("Error executing SQL query:", err)
 		return err
 	}
 	defer db.Close()
@@ -112,11 +113,8 @@ func insertUserIntoDB(username, name, hashedPassword string) error {
 		panic(err)
 	}
 
-	sqlStatement := `INSERT INTO users (username, name, password) VALUES ($1, $2, $3)`
-	fmt.Printf("Executing query: %s\n", sqlStatement)
-	fmt.Printf("Parameters: Username: %s, Name: %s, Hashed Password: %s\n", username, name, hashedPassword)
-
 	// EXECUTE
+	sqlStatement := `INSERT INTO users (username, name, password) VALUES ($1, $2, $3)`
 	_, err = db.Exec(sqlStatement, username, name, hashedPassword)
 	if err != nil {
 		return err
