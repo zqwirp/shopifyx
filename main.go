@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 const (
@@ -56,7 +56,7 @@ func registerUser(c *gin.Context) {
 
 	// SHOULD BIND JSON?
 	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.Status(http.StatusBadRequest)
 		return
 	}
 
@@ -68,7 +68,11 @@ func registerUser(c *gin.Context) {
 	}
 
 	// STORE USER INFO INTO DB
-	if err := insertUserIntoDB(user.Username, user.Name, hashedPassword); err != nil {
+	if code, err := insertUserIntoDB(user.Username, user.Name, hashedPassword); err != nil {
+		if code == "23505" {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -95,7 +99,7 @@ func hashPassword(password string) (string, error) {
 // 	return err == nil
 // }
 
-func insertUserIntoDB(username, name, hashedPassword string) error {
+func insertUserIntoDB(username, name, hashedPassword string) (pq.ErrorCode, error) {
 	// CONNECT TO POSTGRES
 	db, err := sql.Open(
 		"postgres",
@@ -103,7 +107,8 @@ func insertUserIntoDB(username, name, hashedPassword string) error {
 			"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 			HOST, PORT, DB_USER, DB_PASSWORD, DB_NAME))
 	if err != nil {
-		return err
+		pgErr, _ := err.(*pq.Error)
+		return pgErr.Code, err
 	}
 	defer db.Close()
 
@@ -117,10 +122,14 @@ func insertUserIntoDB(username, name, hashedPassword string) error {
 	sqlStatement := `INSERT INTO users (username, name, password) VALUES ($1, $2, $3)`
 	_, err = db.Exec(sqlStatement, username, name, hashedPassword)
 	if err != nil {
-		return err
+		pgErr, ok := err.(*pq.Error)
+		if ok && pgErr.Code == "23505" {
+			return pgErr.Code, err
+		}
+		return pgErr.Code, err
 	}
 
-	return nil
+	return "", nil
 }
 
 func getUsers(c *gin.Context) {
