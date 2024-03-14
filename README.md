@@ -35,3 +35,7 @@ migrate down:
 ```
 migrate -database "postgres://postgres@localhost:5432/shopifyx_sprint?sslmode=disable" -path db/migrations down
 ```
+
+## Source
+
+[https://www.calhoun.io/querying-for-a-single-record-using-gos-database-sql-package/](https://www.calhoun.io/querying-for-a-single-record-using-gos-database-sql-package/)
