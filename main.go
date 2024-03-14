@@ -17,7 +17,7 @@ const (
 	HOST        = "localhost"
 	PORT        = "5432"
 	DB_USER     = "postgres"
-	DB_PASSWORD = ""
+	DB_PASSWORD = "postgres" // SEPERTINYA HARUS PAKAI PASSWORD MAS
 	DB_NAME     = "shopifyx_sprint"
 )
 
@@ -69,7 +69,7 @@ func registerUser(c *gin.Context) {
 
 	// STORE USER INFO INTO DB
 	if err := insertUserIntoDB(user.Username, user.Name, hashedPassword); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
