@@ -3,13 +3,14 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 
-	_ "github.com/lib/pq" // Import the PostgreSQL driver
+	_ "github.com/lib/pq"
 )
 
 const (
@@ -31,19 +32,12 @@ func main() {
 	}))
 
 	// ROUTES
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "pong",
-		})
-	})
-	r.POST("/pong", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "ping",
-		})
-	})
+	r.GET("/ping", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"message": "pong"}) })
+	r.POST("/pong", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"message": "ping"}) })
 
 	v1 := r.Group("/v1")
 	{
+		v1.GET("/users", getUsers)
 		v1.POST("/user/register", registerUser)
 	}
 	// END OF ROUTES
@@ -56,10 +50,6 @@ type User struct {
 	Name     string `json:"name" binding:"required,min=5,max=50"`
 	Password string `json:"password" binding:"required,min=5,max=15"`
 }
-
-// "username": "seseorang", // not null, minLength 5, maxLength 15
-// "name": "namadepan namabelakang", // not null, minLength 5, maxLength 50
-// "password": "" // not null, minLength 5, maxLength 15
 
 func registerUser(c *gin.Context) {
 	var user User
@@ -103,7 +93,7 @@ func CheckPasswordHash(password, hash string) bool {
 }
 
 func insertUserIntoDB(username, name, hashedPassword string) error {
-	// ESTABLISH A CONNECTION TO THE POSTGRESQL DATABASE
+	// CONNECT TO POSTGRES
 	fmt.Println("Connecting to the database...")
 	db, err := sql.Open("postgres", fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		HOST, PORT, DB_USER, DB_PASSWORD, DB_NAME))
@@ -119,15 +109,74 @@ func insertUserIntoDB(username, name, hashedPassword string) error {
 	}
 
 	sqlStatement := `INSERT INTO users (username, name, password) VALUES ($1, $2, $3)`
-	fmt.Println("Executing SQL query...")
 	fmt.Printf("Executing query: %s\n", sqlStatement)
 	fmt.Printf("Parameters: Username: %s, Name: %s, Hashed Password: %s\n", username, name, hashedPassword)
-	// EXECUTE THE SQL QUERY TO INSERT A NEW USER
+	// EXECUTE
 	_, err = db.Exec(sqlStatement, username, name, hashedPassword)
-	// _, err = db.Exec(sqlStatement)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func getUsers(c *gin.Context) {
+	users, err := selectUsersFromDB()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve users",
+		})
+		return
+	}
+
+	// RESPONSE
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Users retrieved successfully",
+		"data": gin.H{
+			"users": users,
+		},
+	})
+}
+
+func selectUsersFromDB() ([]User, error) {
+	// CONNECT TO POSTGRES
+	db, err := sql.Open("postgres", fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		HOST, PORT, DB_USER, DB_PASSWORD, DB_NAME))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to the database: %v", err)
+	}
+	defer db.Close()
+
+	// CHECK DB CONNECTION
+	err = db.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("failed to ping the database: %v", err)
+	}
+
+	// DEFINE SQL STATEMENT
+	sqlStatement := `SELECT username, name FROM users`
+
+	log.Printf("Executing SQL query: %s", sqlStatement)
+
+	// EXECUTE
+	rows, err := db.Query(sqlStatement)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute SQL query: %v", err)
+	}
+	defer rows.Close()
+
+	// STORE QUERY RESULT TO VARIABLE
+	var users []User
+	for rows.Next() {
+		var user User
+		err := rows.Scan(&user.Username, &user.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %v", err)
+		}
+		users = append(users, user)
+	}
+
+	log.Println("All users selected successfully.")
+
+	return users, nil
 }
