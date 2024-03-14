@@ -60,17 +60,20 @@ func registerUser(c *gin.Context) {
 		return
 	}
 
+	// ENCRYPT PASSWORD
 	hashedPassword, err := HashPassword(user.Password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user"})
 		return
 	}
 
+	// STORE USER INFO INTO DB
 	if err := insertUserIntoDB(user.Username, user.Name, hashedPassword); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user"})
 		return
 	}
 
+	// TEST SET COOKIE
 	c.SetCookie("accessToken", "THE_TOKEN", 3600, "/", "", false, true)
 
 	// RESPONSE
@@ -103,6 +106,7 @@ func insertUserIntoDB(username, name, hashedPassword string) error {
 	}
 	defer db.Close()
 
+	// CHECK DB CONNECTION
 	err = db.Ping()
 	if err != nil {
 		panic(err)
@@ -111,6 +115,7 @@ func insertUserIntoDB(username, name, hashedPassword string) error {
 	sqlStatement := `INSERT INTO users (username, name, password) VALUES ($1, $2, $3)`
 	fmt.Printf("Executing query: %s\n", sqlStatement)
 	fmt.Printf("Parameters: Username: %s, Name: %s, Hashed Password: %s\n", username, name, hashedPassword)
+
 	// EXECUTE
 	_, err = db.Exec(sqlStatement, username, name, hashedPassword)
 	if err != nil {
